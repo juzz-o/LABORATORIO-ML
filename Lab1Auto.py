@@ -21,19 +21,19 @@ df =pd.read_csv('framingham.csv')
 print(df.head())
 print (df.info())
 print(df.describe())
-
+print('------------------------------------------------------------------------------------------------------------------------')
 #Para el trabajo que voy a hacer, no encuentro necesario tener la columna 'education' tal vez esto podría estar relacionado con la
 #probabildiad de ser fumador o consumir drogas. Pero esto directamente no se relaciona con la enfermedad cardiaca. Lo que sí se relaciona
 #es el uso de sustancias, pero no su nivel educativo.
 
 df = df.drop(columns=['education'])
 print(df.info())
-
+print('------------------------------------------------------------------------------------------------------------------------')
 #vamos a buscar valores faltantes o nulos.
 
 print(df.isnull().sum())
 
-
+print('------------------------------------------------------------------------------------------------------------------------')
 #Tenemos 5 columnas con valores nulos, vamos a reemplazar esos datos con la media de cada columna. Primero creamos el imputador de datos.
 
 meanimpputer = SimpleImputer(strategy='mean')
@@ -46,14 +46,19 @@ df[['cigsPerDay', 'BPMeds', 'totChol', 'BMI', 'heartRate', 'glucose']] = meanimp
 
 print (df.isnull().sum())
 print (df.info())
-print (df.describe())
+
+print('------------------------------------------------------------------------------------------------------------------------')
+
+
+
+
 
 #Como ya tenemos el dataframe limpio, vamos a empezar a preparar los datos para el modelo de machine learning.
 #Primero vamos a mirar cuáles columnas hay que estandarizar y cuáles no. (las que estén con valores de 1 y 0 no es necesario estandarizarlas)
 #Y desde el principio vimos que nuestras características son todas numéricas, por lo que no es necesario hacer codificación one-hot o label encoding.
-
+print('------------------------------------------------------------------------------------------------------------------------')
 print(df.nunique()) 
-
+print('------------------------------------------------------------------------------------------------------------------------')
 #observamos que las columnas 'male', 'current smoker', 'prevalentStroke', 'prevalentHyp', 'diabetes' están en formato 1 y 0, por lo que no es necesario estandarizarlas.
 #Aparte, nuestro target es la columna 'TenYearCHD' por lo que no hay que estandarizarla tampoco.
 #Ahora crearemos un pipeline. Primero separamos las características del target.
@@ -108,6 +113,7 @@ rf_val_acc = accuracy_score(y_val, rf.predict(X_val))
 rf_test_acc = accuracy_score(y_test, rf.predict(X_test))
 
 #Hacemos el modelo de redes neuronales 
+
 model = models.Sequential([
     layers.Input(shape=(X_train.shape[1],)),
     layers.Dense(64, activation="relu", kernel_regularizer=tf.keras.regularizers.l2(0.001)),
@@ -125,21 +131,22 @@ dnn_train_acc = model.evaluate(X_train, y_train, verbose=0)[1]
 dnn_val_acc = model.evaluate(X_val, y_val, verbose=0)[1]
 dnn_test_acc = model.evaluate(X_test, y_test, verbose=0)[1]
 
-#Paramos los resultados en un dataframe hacemos lo siguiente
+#Para ver los resultados en un dataframe hacemos lo siguiente
+
 results = pd.DataFrame({
     "Modelo": ["kNN", "Random Forest", "Deep Neural Net"],
     "Train Accuracy": [knn_train_acc, rf_train_acc, dnn_train_acc],
     "Val Accuracy": [knn_val_acc, rf_val_acc, dnn_val_acc],
     "Test Accuracy": [knn_test_acc, rf_test_acc, dnn_test_acc]
 })
-
+print('------------------------------------------------------------------------------------------------------------------------')
 print(results)
+print('------------------------------------------------------------------------------------------------------------------------')
+#probamos con un dato nuevo inventado
 
-#probamos con un dato nuevo
-#Creamos un individuo inventado
 
 sample = pd.DataFrame([{
-    'male': 1,              # Hombre
+    'male': 1,              
     'age': 55,
     'currentSmoker': 1,
     'cigsPerDay': 10,
@@ -159,10 +166,46 @@ sample = pd.DataFrame([{
 
 sample[numerico] = scaler.transform(sample[numerico])
 
-# Predecir con el modelo Random Forest
+sample_final = np.hstack([sample[numerico].values, sample[binario].values])
+# Predecir con el modelo DNN
 
-pred = rf.predict(sample)
-prob = rf.predict_proba(sample)
+prob_dnn = model.predict(sample_final)  # entrega la probabilidad (entre 0 y 1)
+pred_dnn = (prob_dnn > 0.5).astype(int)  # convertir a clase 0 o 1
 
-print("Predicción:", pred[0])
-print("Probabilidad de riesgo:", prob[0][1])
+print('------------------------------------------------------------------------------------------------------------------------')
+print("Predicción (DNN):", pred_dnn[0][0])
+print("Probabilidad de riesgo (DNN):", prob_dnn[0][0])
+print('------------------------------------------------------------------------------------------------------------------------')
+print(df['sysBP'].describe())
+
+#ahora vamos a hacer un análisis exploratorio de datos para encontrar relaciones entre las características y el target y ver la distrubución de mis datos(TenYearCHD)
+import matplotlib.pyplot as plt
+import seaborn as sns
+df.hist(figsize=(15, 10), bins=30)
+plt.suptitle("Distribución de las variables", fontsize=16)
+plt.show()
+
+plt.figure(figsize=(12,8))
+sns.heatmap(df.corr(), annot=False, cmap="coolwarm")
+plt.title("Matriz de correlación", fontsize=14)
+plt.show()
+
+
+plt.figure(figsize=(15, 10))
+
+for i, col in enumerate(numerico, 1):
+    plt.subplot(3, 3, i)  # rejilla de 3x3
+    sns.boxplot(data=df, x="TenYearCHD", y=col, palette="Set2")
+    plt.title(f"{col} vs TenYearCHD")
+
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(8,6))
+corr_target = df.corr()["TenYearCHD"].drop("TenYearCHD").sort_values(ascending=False)
+sns.barplot(x=corr_target, y=corr_target.index, palette="coolwarm")
+plt.title("Correlación de variables con el riesgo (TenYearCHD)")
+plt.show()
+
+
+
